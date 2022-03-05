@@ -1,0 +1,4 @@
+build/
+.vscode/
+func_test.cpp
+func_test
