@@ -103,12 +103,12 @@ void PrintGraph::print() {
 	// Connect edge between blocks
 	for(int i=0; i<blockNum; i++) {
 		BasicBlock block = graphObj.graph[i];
-		if(block.fall_through != nullptr) {
-			out << "bb" << (i+1) << ":s -> " << "bb" << block.fall_through->id << ":n ";
+		if(block.fall_through != std::nullopt) {
+			out << "bb" << (i+1) << ":s -> " << "bb" << graphObj.graph[block.fall_through.value()].id << ":n ";
 			out << "[label=\"fall-through\"];\n";
 		}
-		if(block.branch != nullptr) {
-			out << "bb" << (i+1) << ":s -> " << "bb" << block.branch->id << ":n ";
+		if(block.branch != std::nullopt) {
+			out << "bb" << (i+1) << ":s -> " << "bb" << graphObj.graph[block.branch.value()].id << ":n ";
 			out << "[label=\"branch\"];\n";
 		}
 	}

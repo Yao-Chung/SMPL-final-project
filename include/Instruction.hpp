@@ -46,10 +46,12 @@ public:
 class BasicBlock : public std::vector<Instruct> {
 public:
     int id;
-    BasicBlock *branch = nullptr;
-    BasicBlock *fall_through = nullptr;
     std::unordered_map<std::string, Variable> findIdent;
-    BasicBlock(std::unordered_map<std::string, Variable> findIdent);
+    std::optional<BlockId> fall_through;
+    std::optional<BlockId> branch;
+    BasicBlock(std::unordered_map<std::string, Variable> findIdent, 
+               std::optional<BlockId> fall_through = std::nullopt,
+               std::optional<BlockId> branch = std::nullopt);
 };
 
 // Data structure of whole graph

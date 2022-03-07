@@ -8,8 +8,8 @@ opcode(opcode), x(x), y(y) {
     this->id = id;
 }
 
-BasicBlock::BasicBlock(std::unordered_map<std::string, Variable> findIdent) :
-findIdent(findIdent) {
+BasicBlock::BasicBlock(std::unordered_map<std::string, Variable> findIdent, std::optional<BlockId> fall_through, std::optional<BlockId> branch) :
+findIdent(findIdent), fall_through(fall_through), branch(branch) {
     Instruct instruct(OpCode::op_init);
     this->push_back(instruct);
     static int id = 0;

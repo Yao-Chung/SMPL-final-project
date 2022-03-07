@@ -12,7 +12,7 @@ if b5>=b3
 then let b2<-100; 
 else 
 let b2<-101; 
-fi;
+fi; 
 else 
 let b3<-1001; 
 fi;

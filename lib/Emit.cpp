@@ -192,11 +192,11 @@ void emitIfStatement() {
             BlockId blockIndex = std::any_cast<BlockId>(contextObj.consumed.top());
             contextObj.consumed.pop();
             if(linkCnt == 0) {
-                graphObj.graph[blockIndex].fall_through = &graphObj.graph.back();
+                graphObj.graph[blockIndex].fall_through = (BlockId)graphObj.graph.size() - 1;
                 mpFall = graphObj.graph[blockIndex].findIdent;
                 linkCnt += 1;
             }else {
-                graphObj.graph[blockIndex].branch = &graphObj.graph.back();
+                graphObj.graph[blockIndex].branch = (BlockId)graphObj.graph.size() - 1;
                 mpBranch = graphObj.graph[blockIndex].findIdent;
                 branchIndex = blockIndex;
                 linkCnt += 1;
@@ -215,7 +215,7 @@ void emitIfStatement() {
     contextObj.consumed.push((BlockId)graphObj.graph.size()-1);
     // Test link is all set or not
     if(linkCnt < 2) {
-        graphObj.graph[headIndex].branch = &graphObj.graph.back();
+        graphObj.graph[headIndex].branch = (BlockId)graphObj.graph.size() - 1;
         mpBranch = graphObj.graph[headIndex].findIdent;
         branchIndex = headIndex;
         linkCnt += 1;
@@ -236,30 +236,31 @@ void emitIfStatement() {
     
     // Add branch instruction into block (blockIndex)
     // Head branch
+    BlockId branchToId = graphObj.graph[headIndex].branch.value();
     switch (cmpOp) {
         case RelOp::EQ:
-            graphObj.graph[headIndex].emplace_back(OpCode::op_bne, cmp_id, graphObj.graph[headIndex].branch->front().id);
+            graphObj.graph[headIndex].emplace_back(OpCode::op_bne, cmp_id, graphObj.graph[branchToId].front().id);
             break;
         case RelOp::NEQ:
-            graphObj.graph[headIndex].emplace_back(OpCode::op_beq, cmp_id, graphObj.graph[headIndex].branch->front().id);
+            graphObj.graph[headIndex].emplace_back(OpCode::op_beq, cmp_id, graphObj.graph[branchToId].front().id);
             break;
         case RelOp::LT:
-            graphObj.graph[headIndex].emplace_back(OpCode::op_bge, cmp_id, graphObj.graph[headIndex].branch->front().id);
+            graphObj.graph[headIndex].emplace_back(OpCode::op_bge, cmp_id, graphObj.graph[branchToId].front().id);
             break;
         case RelOp::LTEQ:
-            graphObj.graph[headIndex].emplace_back(OpCode::op_bgt, cmp_id, graphObj.graph[headIndex].branch->front().id);
+            graphObj.graph[headIndex].emplace_back(OpCode::op_bgt, cmp_id, graphObj.graph[branchToId].front().id);
             break;
         case RelOp::GT:
-            graphObj.graph[headIndex].emplace_back(OpCode::op_ble, cmp_id, graphObj.graph[headIndex].branch->front().id);
+            graphObj.graph[headIndex].emplace_back(OpCode::op_ble, cmp_id, graphObj.graph[branchToId].front().id);
             break;
         case RelOp::GTEQ:
-            graphObj.graph[headIndex].emplace_back(OpCode::op_blt, cmp_id, graphObj.graph[headIndex].branch->front().id);
+            graphObj.graph[headIndex].emplace_back(OpCode::op_blt, cmp_id, graphObj.graph[branchToId].front().id);
             break;
     }
 
     // branch to joint
     if(headIndex != branchIndex) {
-        graphObj.graph[branchIndex].emplace_back(OpCode::op_bra, graphObj.graph[branchIndex].branch->front().id);
+        graphObj.graph[branchIndex].emplace_back(OpCode::op_bra, graphObj.graph.back().front().id);
     }
 
     // Pop block from blocks stack and push itself
@@ -277,10 +278,10 @@ void startStatSequence() {
         graphObj.graph.push_back(BasicBlock(graphObj.graph[lastIndex].findIdent));
 
         // Connect new block with last block
-        if(graphObj.graph[lastIndex].fall_through == nullptr) {
-            graphObj.graph[lastIndex].fall_through = &graphObj.graph.back();
+        if(graphObj.graph[lastIndex].fall_through == std::nullopt) {
+            graphObj.graph[lastIndex].fall_through = (BlockId)graphObj.graph.size() - 1;
         }else {
-            graphObj.graph[lastIndex].branch = &graphObj.graph.back();
+            graphObj.graph[lastIndex].branch = (BlockId)graphObj.graph.size() - 1;
         }
     }
     // Push index of basic block into stack
