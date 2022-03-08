@@ -14,12 +14,15 @@ void emitTerm(const std::string &operators);
 void emitExpression(const std::string &operators);
 void emitRelation();
 void emitAssignment();
-// void startIfStatement();
 void emitIfStatement();
+void emitWhileStatement();
 void startStatSequence();
 void endStatSequence();
 void emitTypeDecl(const int &dimNumber);
 void emitVarDecl();     // Put variable into map
 void emitComputation();
+void rewrite_after_loop();
+void common_subexpression_elimination();
+void copy_propagation();
 
 #endif

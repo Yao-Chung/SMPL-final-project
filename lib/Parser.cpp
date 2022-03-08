@@ -282,9 +282,10 @@ bool isWhileStatement(std::string_view &s){
     if(s_copy.size() < 3 || s_copy.substr(0, 3) != std::string_view(" od")){
         return false;
     }
-    // Consume "od"
+    // Consume " od"
     s_copy = s_copy.substr(3);
     s = s_copy;
+    emitWhileStatement();
     return true;
 }
 
@@ -516,5 +517,6 @@ bool isComputation(std::string_view &s){
     // Consume "}."
     s_copy = s_copy.substr(2);
     s = s_copy;
+    emitComputation();
     return true;
 }

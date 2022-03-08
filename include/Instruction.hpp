@@ -28,7 +28,7 @@ public:
     std::optional<int> x;
     std::optional<int> y;
     int id;
-    Instruct(OpCode opcode, std::optional<int> x = std::nullopt, std::optional<int> y = std::nullopt);
+    Instruct(OpCode opcode = OpCode::op_init, std::optional<int> x = std::nullopt, std::optional<int> y = std::nullopt);
 };
 
 using DataType = std::vector<int>;      // Empty vector => var, otherwise => array
@@ -49,9 +49,11 @@ public:
     std::unordered_map<std::string, Variable> findIdent;
     std::optional<BlockId> fall_through;
     std::optional<BlockId> branch;
+    std::optional<BlockId> dom;
     BasicBlock(std::unordered_map<std::string, Variable> findIdent, 
                std::optional<BlockId> fall_through = std::nullopt,
-               std::optional<BlockId> branch = std::nullopt);
+               std::optional<BlockId> branch = std::nullopt,
+               std::optional<BlockId> dom = std::nullopt);
 };
 
 // Data structure of whole graph
@@ -66,8 +68,6 @@ class GraphManager {
 public:
     static GraphManager &instance();
     Graph graph;
-    // RC addBasicBlock();
-    // RC putVariable(const std::string &identName, const Variable &variable);
 protected:
     GraphManager() = default;
 };

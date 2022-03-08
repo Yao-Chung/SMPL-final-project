@@ -167,7 +167,7 @@ void emitAssignment() {
     // Test ident in the block map or not
     GraphManager &graphObj = GraphManager::instance();
     if(!graphObj.graph.back().findIdent.contains(identName)) {
-        std::cout << identName << std::endl;
+        std::cout << identName << " does not exist!" << std::endl;
         throw std::invalid_argument("No this identifier.");
     }
     // Assign exp_id to identifier
@@ -264,8 +264,112 @@ void emitIfStatement() {
     }
 
     // Pop block from blocks stack and push itself
+    graphObj.graph.back().dom = contextObj.blocks.top();
     contextObj.blocks.pop();
     contextObj.blocks.push((BlockId)graphObj.graph.size()-1);
+}
+void emitWhileStatement() {
+    // Get instance of singleton class
+    ContextManager &contextObj = ContextManager::instance();
+    GraphManager &graphObj = GraphManager::instance();
+    
+    // Get two block index from consumed
+    int received = 0;
+    BlockId upIndex, downIndex;
+    RelOp cmpOp;
+    while(received < 2)
+    {
+        if(contextObj.consumed.top().type() == typeid(BlockId)) {
+            if(received == 0) {
+                downIndex = std::any_cast<BlockId>(contextObj.consumed.top());
+            }else {
+                upIndex = std::any_cast<BlockId>(contextObj.consumed.top());
+            }
+            received += 1;
+        }
+        else if(contextObj.consumed.top().type() == typeid(RelOp) && received == 1) {
+            cmpOp = std::any_cast<RelOp>(contextObj.consumed.top());
+        }
+        contextObj.consumed.pop();
+    }
+    
+    // Create new block
+    std::unordered_map<std::string, Variable> tmp;
+    graphObj.graph.push_back(BasicBlock(tmp));
+    
+    // Get two ident map of block
+    std::unordered_map<std::string, Variable> upMap, downMap;
+    upMap = graphObj.graph[upIndex].findIdent;
+    downMap = graphObj.graph[downIndex].findIdent;
+
+    // Get the original cmp instruction
+    Instruct oldCmpInstruct = graphObj.graph[upIndex].back();
+    graphObj.graph[upIndex].pop_back();
+
+    // Compare map and add phi instructions
+    std::optional<int> downBranchId = std::nullopt;
+    for(auto [ident, variable]: upMap) {
+        if(upMap[ident].exp_id != downMap[ident].exp_id) {
+            Instruct instruct(OpCode::op_phi, upMap[ident].exp_id, downMap[ident].exp_id);
+            graphObj.graph[upIndex].push_back(instruct);
+            graphObj.graph[upIndex].findIdent[ident].exp_id = instruct.id;
+            if(downBranchId == std::nullopt) {
+                downBranchId = instruct.id;
+            }
+            if(upMap[ident].exp_id == oldCmpInstruct.x.value()) {
+                oldCmpInstruct.x = instruct.id;
+            }else if(upMap[ident].exp_id == oldCmpInstruct.y.value()) {
+                oldCmpInstruct.y = instruct.id;
+            }
+        }
+    }
+
+    // Put cmp instruct back to basic block
+    graphObj.graph[upIndex].push_back(oldCmpInstruct);
+    if(downBranchId == std::nullopt) {
+        // No phi function
+        downBranchId = oldCmpInstruct.id;
+    }
+
+    // Set the branch link
+    graphObj.graph[upIndex].branch = (BlockId)graphObj.graph.size() - 1;
+    graphObj.graph[downIndex].branch = upIndex;
+
+    // Add branch instruction
+    graphObj.graph[downIndex].emplace_back(OpCode::op_bra, downBranchId.value());
+    int branchToInstructId = graphObj.graph.back().front().id;
+    int cmp_id = oldCmpInstruct.id;
+    switch (cmpOp) {
+        case RelOp::EQ:
+            graphObj.graph[upIndex].emplace_back(OpCode::op_bne, cmp_id, branchToInstructId);
+            break;
+        case RelOp::NEQ:
+            graphObj.graph[upIndex].emplace_back(OpCode::op_beq, cmp_id, branchToInstructId);
+            break;
+        case RelOp::LT:
+            graphObj.graph[upIndex].emplace_back(OpCode::op_bge, cmp_id, branchToInstructId);
+            break;
+        case RelOp::LTEQ:
+            graphObj.graph[upIndex].emplace_back(OpCode::op_bgt, cmp_id, branchToInstructId);
+            break;
+        case RelOp::GT:
+            graphObj.graph[upIndex].emplace_back(OpCode::op_ble, cmp_id, branchToInstructId);
+            break;
+        case RelOp::GTEQ:
+            graphObj.graph[upIndex].emplace_back(OpCode::op_blt, cmp_id, branchToInstructId);
+            break;
+    }
+    
+    // Update the map of head block and new block
+    graphObj.graph.back().findIdent = graphObj.graph[upIndex].findIdent;
+
+    // Pop block from blocks stack and push new block into stack
+    graphObj.graph.back().dom =  contextObj.blocks.top();
+    contextObj.blocks.pop();
+    contextObj.blocks.push((BlockId)graphObj.graph.size() - 1);
+
+    // Push new block id into consumed stack
+    contextObj.consumed.push((BlockId)graphObj.graph.size() - 1);
 }
 void startStatSequence() {
     GraphManager &graphObj = GraphManager::instance();
@@ -283,6 +387,8 @@ void startStatSequence() {
         }else {
             graphObj.graph[lastIndex].branch = (BlockId)graphObj.graph.size() - 1;
         }
+        // Build dom link
+        graphObj.graph.back().dom = lastIndex;
     }
     // Push index of basic block into stack
     // The type of index is unsigned
@@ -322,6 +428,35 @@ void emitVarDecl() {
     }
 }
 void emitComputation() {
-
+    rewrite_after_loop();
 }
+void rewrite_after_loop() {
+    // Get instance from singleton class
+    GraphManager &graphObj = GraphManager::instance();
+    ContextManager &contextObj = ContextManager::instance();
 
+    // Rewrite from root
+    std::optional<BlockId> curIndex = 0;
+    std::unordered_map<int, int> lastMap;
+    while(curIndex != std::nullopt) {
+        // Build curMap before rewriting
+        std::unordered_map<int, int> curMap;
+        for(auto &instruct: graphObj.graph[curIndex.value()]) {
+            if(instruct.opcode == OpCode::op_phi) {
+                curMap[instruct.x.value()] = instruct.id;
+                curMap[instruct.y.value()] = instruct.id;
+            }
+            if(instruct.x != std::nullopt && lastMap.count(instruct.x.value())) {
+                instruct.x = lastMap[instruct.x.value()];
+            }
+            if(instruct.y != std::nullopt && lastMap.count(instruct.y.value())) {
+                instruct.y = lastMap[instruct.y.value()];
+            }
+        }
+        lastMap = curMap;
+        curIndex = graphObj.graph[curIndex.value()].fall_through;
+    }
+}
+void common_subexpression_elimination() {
+    // 
+}

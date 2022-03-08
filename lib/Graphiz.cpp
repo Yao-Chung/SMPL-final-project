@@ -111,6 +111,10 @@ void PrintGraph::print() {
 			out << "bb" << (i+1) << ":s -> " << "bb" << graphObj.graph[block.branch.value()].id << ":n ";
 			out << "[label=\"branch\"];\n";
 		}
+		if(block.dom != std::nullopt) {
+			out << "bb" << (block.dom.value() + 1) << ":b -> " << "bb" << (i+1) << ":b";
+			out << "[color=blue, style=solid, label=\"dom\"]\n";
+		}
 	}
     out << "\n}";
 }
