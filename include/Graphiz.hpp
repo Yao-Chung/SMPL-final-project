@@ -4,14 +4,13 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include <Instruction.hpp>
+#include <Emit.hpp>
 
 class PrintGraph {
 public:
     std::string fileName;
     std::ofstream out;
     PrintGraph(const std::string fileName="graphiz.dot");
-    std::string opCode_to_string(Instruct instruct);
     void print();
 };
 

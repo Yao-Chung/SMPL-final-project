@@ -1,6 +1,7 @@
 #include <Emit.hpp>
-#include <Instruction.hpp>
 #include <stdexcept>
+#include <sstream>
+#include <unordered_map>
 
 void emitDigit(const char &c) {
     ContextManager &contextObj = ContextManager::instance();
@@ -458,5 +459,141 @@ void rewrite_after_loop() {
     }
 }
 void common_subexpression_elimination() {
-    // 
+    // Get instance from singleton class
+    GraphManager &graphObj = GraphManager::instance();
+    ContextManager &contextObj = ContextManager::instance();
+
+    std::unordered_map<int, int> replace;
+    while(true) {
+        unsigned oidSize = replace.size();
+        // For each basic block, do common subexpression elimination
+        for(int i=0; i<graphObj.graph.size(); i++) {
+            // Build the set of dominated blocks' instruction
+            std::unordered_map<std::string, Instruct> domInstruct;
+            BlockId curIndex = i;
+            while(graphObj.graph[curIndex].dom != std::nullopt) {
+                curIndex = graphObj.graph[curIndex].dom.value();
+                for(auto instruct: graphObj.graph[curIndex]) {
+                    domInstruct[opCode_to_string(instruct)] = instruct;
+                }
+            }
+            // Compare current block's instruction with domInstruct
+            BasicBlock block = graphObj.graph[i];
+            block.clear();
+            for(auto instruct: graphObj.graph[i]) {
+                // Test and replace the deleted id
+                if(instruct.x != std::nullopt && replace.count(instruct.x.value())) {
+                    instruct.x = replace[instruct.x.value()];
+                }
+                if(instruct.y != std::nullopt && replace.count(instruct.y.value())) {
+                    instruct.y = replace[instruct.y.value()];
+                }
+                std::string instructStr = opCode_to_string(instruct);
+                if((domInstruct.count(instructStr) && instruct.opcode != OpCode::op_init)) {
+                    // Repeated, then we can not push into block
+                    int deleted_id = instruct.id, dom_id = domInstruct[instructStr].id;
+                    replace[deleted_id] = dom_id;
+                    // Search all blocks and delete deleted_id
+                    // for(int j=0; j<graphObj.graph.size(); j++) {
+                    //     for(auto &instruct2: graphObj.graph[j]) {
+                    //         if(instruct2.x.value() == deleted_id) {
+                    //             instruct2.x = dom_id;
+                    //         }
+                    //         if(instruct2.y.value() == deleted_id) {
+                    //             instruct2.y = dom_id;
+                    //         }
+                    //     }
+                    // }
+                }else if(instruct.opcode == OpCode::op_phi && instruct.x == instruct.y) {
+                    int deleted_id = instruct.id, replace_id = instruct.x.value();
+                    replace[deleted_id] = replace_id;
+                }else {
+                    // No need to eliminate, then we can push into block
+                    block.push_back(instruct);
+                    domInstruct[opCode_to_string(instruct)] = instruct;
+                }
+            }
+            // Replace graph[i] with block
+            graphObj.graph[i] = block;
+        }
+        if(oidSize == replace.size()) {
+            break;
+        }
+    }
+}
+std::string opCode_to_string(Instruct instruct) {
+    std::stringstream ss;
+    switch (instruct.opcode) {
+        case OpCode::op_neg:
+			ss << "neg " << "(" << instruct.x.value() << ")";
+			break;
+		case OpCode::op_add:
+			ss << "add " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_sub:
+			ss << "sub " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_mul:
+			ss << "mul " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_div:
+			ss << "div " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_cmp:
+			ss << "cmp " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_adda:
+			ss << "adda " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_load:
+			ss << "load " << "(" << instruct.x.value() << ")";
+			break;
+		case OpCode::op_store:
+			ss << "store " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_phi:
+			ss << "phi " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_end:
+			ss << "end ";
+			break;
+		case OpCode::op_bra:
+			ss << "bra " << "(" << instruct.x.value() << ")";
+			break;
+		case OpCode::op_bne:
+			ss << "bne " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_beq:
+			ss << "beq " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_ble:
+			ss << "ble " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_blt:
+			ss << "blt " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_bge:
+			ss << "bge " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_bgt:
+			ss << "bgt " << "(" << instruct.x.value() << ")" << " " << "(" << instruct.y.value() << ")";
+			break;
+		case OpCode::op_read:
+			ss << "read ";
+			break;
+		case OpCode::op_write:
+			ss << "write " << "(" << instruct.x.value() << ")";
+			break;
+		case OpCode::op_writeNL:
+			ss << "writeNL ";
+			break;
+		case OpCode::op_cnst:
+			ss << "const " << "#" << instruct.x.value();
+			break;
+		case OpCode::op_init:
+			ss << "\\<init\\>";
+        default:
+            ss << "";
+    }
+    return ss.str();
 }

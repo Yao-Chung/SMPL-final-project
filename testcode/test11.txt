@@ -1,0 +1,9 @@
+main
+varx,y,z1,z2,z3;
+{
+let x<-10;
+let y<-x;
+let z1<-3+y;
+let z2<-3+x;
+let z3<-z1-z2;
+}.

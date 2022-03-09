@@ -1,6 +1,7 @@
 #ifndef EMIT_GUARD
 #define EMIT_GUARD
 
+#include <Instruction.hpp>
 #include <string>
 
 void emitDigit(const char &c);       //Put terminal character to stack
@@ -24,5 +25,6 @@ void emitComputation();
 void rewrite_after_loop();
 void common_subexpression_elimination();
 void copy_propagation();
+std::string opCode_to_string(Instruct instruct);
 
 #endif
