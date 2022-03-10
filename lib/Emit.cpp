@@ -49,55 +49,75 @@ void emitNumber() {
     }
     // std::cout << "Put " << number << " back into stack" << std::endl;
     // Put number back into stack
-    contextObj.consumed.push(stoi(number));
+    contextObj.consumed.push((Number)stoi(number));
 }
 void emitDesignator() {
-    //TODO: handle array
+    ContextManager &contextObj = ContextManager::instance();
+    // Get array dimensions
+    std::vector<ExpId> dims;
+    while(contextObj.consumed.top().type() != typeid(std::string)) {
+        dims.push_back(std::any_cast<ExpId>(contextObj.consumed.top()));
+        contextObj.consumed.pop();
+    }
+    // Get identName
+    std::string identName = std::any_cast<std::string>(contextObj.consumed.top());
+    contextObj.consumed.pop();
+    Designator designator(identName, dims);
+    // Push designator into consumed stack
+    contextObj.consumed.push(designator);
 }
 // Read value from stack
 void emitFactor() {
     ContextManager &contextObj = ContextManager::instance();
     // Factor is Number
-    if(contextObj.consumed.top().type() == typeid(int)) {
+    if(contextObj.consumed.top().type() == typeid(Number)) {
         GraphManager &graphObj = GraphManager::instance();
         // Get number from stack
-        int number = std::any_cast<int>(contextObj.consumed.top());
+        Number number = std::any_cast<Number>(contextObj.consumed.top());
         contextObj.consumed.pop();
         // Put const instruction into basic block
-        Instruct instruct(OpCode::op_cnst, number);
+        Instruct instruct(OpCode::op_cnst, (ExpId)number);
         graphObj.graph.back().push_back(instruct);
         contextObj.consumed.push(instruct.id);
-    }else if(contextObj.consumed.top().type() == typeid(std::string)) {
+    }else if(contextObj.consumed.top().type() == typeid(Designator)) {
         // Factor is designator
         GraphManager &graphObj = GraphManager::instance();
-        std::string identName = std::any_cast<std::string>(contextObj.consumed.top());
+        Designator designator = std::any_cast<Designator>(contextObj.consumed.top());
         contextObj.consumed.pop();
-        if(!graphObj.graph.back().findIdent.contains(identName)) {
-            throw std::invalid_argument( "identifier is not in current graph." );
-        }else if(graphObj.graph.back().findIdent[identName].exp_id == std::nullopt) {
-            throw std::invalid_argument("The value of identifier has not been assigned.");
+        
+        if(designator.dims.empty()) {
+            // This is normal variable
+            if(!graphObj.graph.back().findIdent.contains(designator.identName)) {
+                throw std::invalid_argument( "identifier is not in current graph." );
+            }else if(graphObj.graph.back().findIdent[designator.identName].exp_id == std::nullopt) {
+                throw std::invalid_argument("The value of identifier has not been assigned.");
+            }else {
+                ExpId exp_id = graphObj.graph.back().findIdent[designator.identName].exp_id.value();
+                contextObj.consumed.push(exp_id);
+            }
         }else {
-            int exp_id = graphObj.graph.back().findIdent[identName].exp_id.value();
-            contextObj.consumed.push(exp_id);
+            // This is array
+            //TODO: handle array
         }
     }
-    //TODO: expression and function call
+    // Expression: do nothing since the expId already in consumed stack
+    //TODO:  function call
 }
 void emitTerm(const std::string &operators) {
     ContextManager &contextObj = ContextManager::instance();
     int factorNum = operators.size() + 1;
     // Get ids from stack
-    std::stack<int> factors;
+    std::stack<ExpId> factors;
     for(int i=0; i<factorNum; i++) {
-        factors.push(std::any_cast<int>(contextObj.consumed.top()));
+        factors.push(std::any_cast<ExpId>(contextObj.consumed.top()));
         contextObj.consumed.pop();
     }
     // Put instructions into basic block
     GraphManager &graphObj = GraphManager::instance();
     for(int i=0; i<operators.size(); i++) {
-        int x = factors.top();
+        ExpId x = factors.top();
         factors.pop();
-        int y = factors.top();
+        ExpId y = factors.top();
         factors.pop();
         if(operators[i] == '*') {
             Instruct instruct(OpCode::op_mul, x, y);
@@ -115,17 +135,17 @@ void emitTerm(const std::string &operators) {
 void emitExpression(const std::string &operators) {
     ContextManager &contextObj = ContextManager::instance();
     int termNum = operators.size() + 1;
-    std::stack<int> terms;
+    std::stack<ExpId> terms;
     // Get term ids from stack
     for(int i=0; i<termNum; i++) {
-        terms.push(std::any_cast<int>(contextObj.consumed.top()));
+        terms.push(std::any_cast<ExpId>(contextObj.consumed.top()));
         contextObj.consumed.pop();
     }
     GraphManager &graphObj = GraphManager::instance();
     for(int i=0; i<operators.size(); i++) {
-        int x = terms.top();
+        ExpId x = terms.top();
         terms.pop();
-        int y = terms.top();
+        ExpId y = terms.top();
         terms.pop();
         if(operators[i] == '+') {
             Instruct instruct(OpCode::op_add, x, y);
@@ -142,11 +162,11 @@ void emitExpression(const std::string &operators) {
 }
 void emitRelation() {
     ContextManager &contextObj = ContextManager::instance();
-    int y = std::any_cast<int>(contextObj.consumed.top());
+    ExpId y = std::any_cast<ExpId>(contextObj.consumed.top());
     contextObj.consumed.pop();
     RelOp symbol = std::any_cast<RelOp>(contextObj.consumed.top());
     contextObj.consumed.pop();
-    int x = std::any_cast<int>(contextObj.consumed.top());
+    ExpId x = std::any_cast<ExpId>(contextObj.consumed.top());
     contextObj.consumed.pop();
     Instruct instruct(OpCode::op_cmp, x, y);
     // Put instruction into basic block
@@ -160,19 +180,24 @@ void emitRelation() {
 void emitAssignment() {
     ContextManager &contextObj = ContextManager::instance();
     // Get expression from stack
-    int exp_id = std::any_cast<int>(contextObj.consumed.top());
+    ExpId exp_id = std::any_cast<ExpId>(contextObj.consumed.top());
     contextObj.consumed.pop();
     // Get designator from stack
-    std::string identName = std::any_cast<std::string>(contextObj.consumed.top());
+    Designator designator = std::any_cast<Designator>(contextObj.consumed.top());
     contextObj.consumed.pop();
     // Test ident in the block map or not
     GraphManager &graphObj = GraphManager::instance();
-    if(!graphObj.graph.back().findIdent.contains(identName)) {
-        std::cout << identName << " does not exist!" << std::endl;
+    if(!graphObj.graph.back().findIdent.contains(designator.identName)) {
+        std::cout << designator.identName << " does not exist!" << std::endl;
         throw std::invalid_argument("No this identifier.");
     }
-    // Assign exp_id to identifier
-    graphObj.graph.back().findIdent[identName].exp_id = exp_id;
+    if(designator.dims.empty()) {
+        // This is normal variable, then assign exp_id to identifier
+        graphObj.graph.back().findIdent[designator.identName].exp_id = exp_id;
+    }else {
+        // This is array, then we need to store value represented by exp_id into memory
+        // TODO:
+    }
 }
 void emitIfStatement() {
     ContextManager &contextObj = ContextManager::instance();
@@ -208,7 +233,7 @@ void emitIfStatement() {
     }
     RelOp cmpOp = std::any_cast<RelOp>(contextObj.consumed.top());
     contextObj.consumed.pop();
-    int cmp_id = std::any_cast<int>(contextObj.consumed.top());
+    ExpId cmp_id = std::any_cast<ExpId>(contextObj.consumed.top());
     contextObj.consumed.pop();
     BlockId headIndex = std::any_cast<BlockId>(contextObj.consumed.top());
     contextObj.consumed.pop();
@@ -308,7 +333,7 @@ void emitWhileStatement() {
     graphObj.graph[upIndex].pop_back();
 
     // Compare map and add phi instructions
-    std::optional<int> downBranchId = std::nullopt;
+    std::optional<ExpId> downBranchId = std::nullopt;
     for(auto [ident, variable]: upMap) {
         if(upMap[ident].exp_id != downMap[ident].exp_id) {
             Instruct instruct(OpCode::op_phi, upMap[ident].exp_id, downMap[ident].exp_id);
@@ -338,8 +363,8 @@ void emitWhileStatement() {
 
     // Add branch instruction
     graphObj.graph[downIndex].emplace_back(OpCode::op_bra, downBranchId.value());
-    int branchToInstructId = graphObj.graph.back().front().id;
-    int cmp_id = oldCmpInstruct.id;
+    ExpId branchToInstructId = graphObj.graph.back().front().id;
+    ExpId cmp_id = oldCmpInstruct.id;
     switch (cmpOp) {
         case RelOp::EQ:
             graphObj.graph[upIndex].emplace_back(OpCode::op_bne, cmp_id, branchToInstructId);
@@ -378,7 +403,7 @@ void startStatSequence() {
     if(contextObj.blocks.empty()) {
         graphObj.graph.push_back(BasicBlock(graphObj.graph.findIdent));
     }else {
-        unsigned lastIndex = contextObj.blocks.top();
+        BlockId lastIndex = contextObj.blocks.top();
         // In state sequence nest
         graphObj.graph.push_back(BasicBlock(graphObj.graph[lastIndex].findIdent));
 
@@ -405,7 +430,7 @@ void emitTypeDecl(const int &dimNumber) {
     ContextManager &contextObj = ContextManager::instance();
     DataType type;
     for(int i=0; i<dimNumber; i++) {
-        type.push_back(std::any_cast<int>(contextObj.consumed.top()));
+        type.push_back(std::any_cast<Number>(contextObj.consumed.top()));
         contextObj.consumed.pop();
     }
     // Correct the order
@@ -438,10 +463,10 @@ void rewrite_after_loop() {
 
     // Rewrite from root
     std::optional<BlockId> curIndex = 0;
-    std::unordered_map<int, int> lastMap;
+    std::unordered_map<ExpId, ExpId> lastMap;
     while(curIndex != std::nullopt) {
         // Build curMap before rewriting
-        std::unordered_map<int, int> curMap;
+        std::unordered_map<ExpId, ExpId> curMap;
         for(auto &instruct: graphObj.graph[curIndex.value()]) {
             if(instruct.opcode == OpCode::op_phi) {
                 curMap[instruct.x.value()] = instruct.id;
@@ -463,7 +488,7 @@ void common_subexpression_elimination() {
     GraphManager &graphObj = GraphManager::instance();
     ContextManager &contextObj = ContextManager::instance();
 
-    std::unordered_map<int, int> replace;
+    std::unordered_map<ExpId, ExpId> replace;
     while(true) {
         unsigned oidSize = replace.size();
         // For each basic block, do common subexpression elimination
@@ -491,21 +516,10 @@ void common_subexpression_elimination() {
                 std::string instructStr = opCode_to_string(instruct);
                 if((domInstruct.count(instructStr) && instruct.opcode != OpCode::op_init)) {
                     // Repeated, then we can not push into block
-                    int deleted_id = instruct.id, dom_id = domInstruct[instructStr].id;
+                    ExpId deleted_id = instruct.id, dom_id = domInstruct[instructStr].id;
                     replace[deleted_id] = dom_id;
-                    // Search all blocks and delete deleted_id
-                    // for(int j=0; j<graphObj.graph.size(); j++) {
-                    //     for(auto &instruct2: graphObj.graph[j]) {
-                    //         if(instruct2.x.value() == deleted_id) {
-                    //             instruct2.x = dom_id;
-                    //         }
-                    //         if(instruct2.y.value() == deleted_id) {
-                    //             instruct2.y = dom_id;
-                    //         }
-                    //     }
-                    // }
                 }else if(instruct.opcode == OpCode::op_phi && instruct.x == instruct.y) {
-                    int deleted_id = instruct.id, replace_id = instruct.x.value();
+                    ExpId deleted_id = instruct.id, replace_id = instruct.x.value();
                     replace[deleted_id] = replace_id;
                 }else {
                     // No need to eliminate, then we can push into block

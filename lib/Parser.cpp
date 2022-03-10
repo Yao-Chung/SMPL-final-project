@@ -96,6 +96,7 @@ bool isDesignator(std::string_view &s){
         }
     }
     s = s_copy;
+    emitDesignator();
     return true;
 }
 

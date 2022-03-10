@@ -1,9 +1,9 @@
 #include <Instruction.hpp>
 
 
-Instruct::Instruct(OpCode opcode, std::optional<int> x, std::optional<int> y) : 
+Instruct::Instruct(OpCode opcode, std::optional<ExpId> x, std::optional<ExpId> y) : 
 opcode(opcode), x(x), y(y) {
-    static int id = 0;
+    static ExpId id = 0;
     id += 1;
     this->id = id;
 }
@@ -17,27 +17,14 @@ findIdent(findIdent), fall_through(fall_through), branch(branch), dom(dom) {
     this->id = id;
 }
 
-Variable::Variable(DataType type, std::optional<int> exp_id) : type(type), exp_id(exp_id) {};
+Variable::Variable(DataType type, std::optional<ExpId> exp_id) : type(type), exp_id(exp_id) {};
+
+Designator::Designator(std::string identName, std::vector<ExpId> dims) : identName(identName), dims(dims) {};
 
 GraphManager &GraphManager::instance() {
     static GraphManager single_instance;
     return single_instance;
 }
-
-// RC GraphManager::addBasicBlock() {
-//     BasicBlock newBlock;
-//     graph.push_back(newBlock);
-//     return 0;
-// }
-
-// RC GraphManager::putVariable(const std::string &identName, const Variable &variable) {
-//     // Ident already exists
-//     if(graph.findIdent.contains(identName)) {
-//         return -1;
-//     }
-//     graph.findIdent[identName] = variable;
-//     return 0;
-// }
 
 ContextManager &ContextManager::instance() {
     // Using default constructor

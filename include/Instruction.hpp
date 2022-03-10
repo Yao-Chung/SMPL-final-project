@@ -21,25 +21,35 @@ enum class RelOp {
     EQ, NEQ, LT, LTEQ, GT, GTEQ
 };
 
+using ExpId = int;                      // id for instruction in basic block
+using Number = unsigned long;
+using DataType = std::vector<Number>;      // Empty vector => var, otherwise => array
+using BlockId = unsigned;
+
 // Data structure of each instruction
 class Instruct {
 public:
     OpCode opcode;
-    std::optional<int> x;
-    std::optional<int> y;
-    int id;
-    Instruct(OpCode opcode = OpCode::op_init, std::optional<int> x = std::nullopt, std::optional<int> y = std::nullopt);
+    std::optional<ExpId> x;
+    std::optional<ExpId> y;
+    ExpId id;
+    Instruct(OpCode opcode = OpCode::op_init, std::optional<ExpId> x = std::nullopt, std::optional<ExpId> y = std::nullopt);
 };
-
-using DataType = std::vector<int>;      // Empty vector => var, otherwise => array
-using BlockId = unsigned;
 
 // The attribute of variable
 class Variable {
 public:
     DataType type;
-    std::optional<int> exp_id;
-    Variable(DataType type = {}, std::optional<int> exp_id = std::nullopt);
+    // std::optional<int> offset;
+    std::optional<ExpId> exp_id;
+    Variable(DataType type = {}, std::optional<ExpId> exp_id = std::nullopt);
+};
+
+class Designator {
+public:
+    std::string identName;
+    std::vector<ExpId> dims;
+    Designator(std::string identName = "", std::vector<ExpId> dims = {});
 };
 
 // Data structure of a basic block
