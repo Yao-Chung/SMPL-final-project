@@ -40,16 +40,16 @@ public:
 class Variable {
 public:
     DataType type;
-    // std::optional<int> offset;
+    std::optional<Number> offset;      // The offset of start position
     std::optional<ExpId> exp_id;
-    Variable(DataType type = {}, std::optional<ExpId> exp_id = std::nullopt);
+    Variable(DataType type = {}, std::optional<Number> arrSize = std::nullopt, std::optional<ExpId> exp_id = std::nullopt);
 };
 
 class Designator {
 public:
     std::string identName;
-    std::vector<ExpId> dims;
-    Designator(std::string identName = "", std::vector<ExpId> dims = {});
+    std::optional<ExpId> address;
+    Designator(std::string identName = "", std::optional<ExpId> address = std::nullopt);
 };
 
 // Data structure of a basic block

@@ -53,18 +53,76 @@ void emitNumber() {
 }
 void emitDesignator() {
     ContextManager &contextObj = ContextManager::instance();
+    GraphManager &graphObj = GraphManager::instance();
     // Get array dimensions
-    std::vector<ExpId> dims;
+    std::vector<ExpId> indexes;
     while(contextObj.consumed.top().type() != typeid(std::string)) {
-        dims.push_back(std::any_cast<ExpId>(contextObj.consumed.top()));
+        indexes.push_back(std::any_cast<ExpId>(contextObj.consumed.top()));
         contextObj.consumed.pop();
     }
+    reverse(indexes.begin(), indexes.end());
     // Get identName
     std::string identName = std::any_cast<std::string>(contextObj.consumed.top());
     contextObj.consumed.pop();
-    Designator designator(identName, dims);
-    // Push designator into consumed stack
-    contextObj.consumed.push(designator);
+
+    // Check identName is valid or not
+    if(!graphObj.graph.back().findIdent.contains(identName)) {
+        throw std::invalid_argument( "identifier is not in current graph." );
+    }
+
+    if(indexes.empty()) {
+        // This is normal variable
+        Designator designator(identName);
+        contextObj.consumed.push(designator);
+    }else {
+        // Calculate the memory address of array (emit instructions to basic block, add offset)
+        DataType type = graphObj.graph.back().findIdent[identName].type;
+        int curPtr = type.size();
+        
+        // The accumulate offset
+        Instruct instructAccOffset(OpCode::op_cnst, 0);
+        graphObj.graph.back().push_back(instructAccOffset);
+        ExpId accOffset = instructAccOffset.id;
+        
+        // The accumulate multiply result
+        Instruct instructAccMul(OpCode::op_cnst, 1);
+        graphObj.graph.back().push_back(instructAccMul);
+        ExpId accMul = instructAccMul.id;
+        
+        // Emit instructions and get the real offset of array
+        while(curPtr > 0) {
+            // Get the exp_id of current index
+            ExpId curIndex = indexes[curPtr-1];
+            // Multiply with accMul and get the result
+            Instruct curMulAcc(OpCode::op_mul, curIndex, accMul);
+            graphObj.graph.back().push_back(curMulAcc);
+            ExpId mulResult = curMulAcc.id;
+            // Update accMul
+            Instruct putOriginIndex(OpCode::op_cnst, type[curPtr-1]);
+            graphObj.graph.back().push_back(putOriginIndex);
+            ExpId originIndex = putOriginIndex.id;
+            Instruct newAccMul(OpCode::op_mul, originIndex, accMul);
+            graphObj.graph.back().push_back(newAccMul);
+            accMul = newAccMul.id;
+            // Update accOffset
+            Instruct addWithAccOffset(OpCode::op_add, mulResult, accOffset);
+            graphObj.graph.back().push_back(addWithAccOffset);
+            accOffset = addWithAccOffset.id;
+            // Update curPtr
+            curPtr -= 1;
+        }
+        // Add accOffset with original offset in designator
+        Instruct putOriginOffset(OpCode::op_cnst, (ExpId)graphObj.graph.back().findIdent[identName].offset.value());
+        graphObj.graph.back().push_back(putOriginOffset);
+        ExpId originOffset = putOriginOffset.id;
+        Instruct getFinalAddress(OpCode::op_add, originOffset, accOffset);
+        graphObj.graph.back().push_back(getFinalAddress);
+        ExpId address = getFinalAddress.id;
+        // Create designator object
+        Designator designator(identName, address);
+        // Push designator into consumed stack
+        contextObj.consumed.push(designator);
+    }
 }
 // Read value from stack
 void emitFactor() {
@@ -85,11 +143,9 @@ void emitFactor() {
         Designator designator = std::any_cast<Designator>(contextObj.consumed.top());
         contextObj.consumed.pop();
         
-        if(designator.dims.empty()) {
+        if(designator.address == std::nullopt) {
             // This is normal variable
-            if(!graphObj.graph.back().findIdent.contains(designator.identName)) {
-                throw std::invalid_argument( "identifier is not in current graph." );
-            }else if(graphObj.graph.back().findIdent[designator.identName].exp_id == std::nullopt) {
+            if(graphObj.graph.back().findIdent[designator.identName].exp_id == std::nullopt) {
                 throw std::invalid_argument("The value of identifier has not been assigned.");
             }else {
                 ExpId exp_id = graphObj.graph.back().findIdent[designator.identName].exp_id.value();
@@ -97,7 +153,9 @@ void emitFactor() {
             }
         }else {
             // This is array
-            //TODO: handle array
+            Instruct getArrayValue(OpCode::op_load, designator.address);
+            graphObj.graph.back().push_back(getArrayValue);
+            contextObj.consumed.push(getArrayValue.id);
         }
     }
     // Expression: do nothing since the expId already in consumed stack
@@ -191,12 +249,13 @@ void emitAssignment() {
         std::cout << designator.identName << " does not exist!" << std::endl;
         throw std::invalid_argument("No this identifier.");
     }
-    if(designator.dims.empty()) {
+    if(designator.address == std::nullopt) {
         // This is normal variable, then assign exp_id to identifier
         graphObj.graph.back().findIdent[designator.identName].exp_id = exp_id;
     }else {
         // This is array, then we need to store value represented by exp_id into memory
-        // TODO:
+        Instruct storeToAddress(OpCode::op_store, exp_id, designator.address);
+        graphObj.graph.back().push_back(storeToAddress);
     }
 }
 void emitIfStatement() {
@@ -445,12 +504,25 @@ void emitVarDecl() {
         identNames.push_back(std::any_cast<std::string>(contextObj.consumed.top()));
         contextObj.consumed.pop();
     }
+    reverse(identNames.begin(), identNames.end());
     DataType type = std::any_cast<DataType>(contextObj.consumed.top());
     contextObj.consumed.pop();
     // Put ident into map in the graph
     GraphManager &graphObj = GraphManager::instance();
-    for(auto identName: identNames) {
-        graphObj.graph.findIdent[identName] = Variable(type);   
+    if(!type.empty()) {
+        // This is array, then count size
+        Number arrSize = 1;
+        for(Number number: type) {
+            arrSize *= number;
+        }
+        for(auto identName: identNames) {
+            graphObj.graph.findIdent[identName] = Variable(type, arrSize);   
+        }
+    }else {
+        // This is normal variable
+        for(auto identName: identNames) {
+            graphObj.graph.findIdent[identName] = Variable(type);   
+        }
     }
 }
 void emitComputation() {

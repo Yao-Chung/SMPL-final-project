@@ -5,7 +5,8 @@
 #include <iostream>
 #include <string>
 
-#define USE_CSE
+// #define USE_CSE
+#define ARR_TEST
 
 int main(int argc, char *argv[]) {
     if(argc != 3) {
@@ -33,7 +34,11 @@ int main(int argc, char *argv[]) {
     printGraph.print();
     GraphManager &graphObj = GraphManager::instance();
     for(auto p: graphObj.graph.back().findIdent) {
-        std::cout << p.first << " <- " << p.second.exp_id.value() << std::endl; 
+    #ifndef ARR_TEST
+        std::cout << p.first << " <- " << p.second.exp_id.value() << std::endl;
+    #else
+        std::cout << p.first << " offset " << p.second.offset.value() << std::endl;
+    #endif
     }
     return 0;
 }

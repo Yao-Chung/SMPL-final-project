@@ -17,9 +17,18 @@ findIdent(findIdent), fall_through(fall_through), branch(branch), dom(dom) {
     this->id = id;
 }
 
-Variable::Variable(DataType type, std::optional<ExpId> exp_id) : type(type), exp_id(exp_id) {};
+Variable::Variable(DataType type, std::optional<Number> arrSize, std::optional<ExpId> exp_id) {
+    this->type = type;
+    this->exp_id = exp_id;
+    static Number cur = 0;
+    if(arrSize != std::nullopt) {
+        // This variable is array
+        this->offset = cur;
+        cur += arrSize.value();
+    }
+};
 
-Designator::Designator(std::string identName, std::vector<ExpId> dims) : identName(identName), dims(dims) {};
+Designator::Designator(std::string identName, std::optional<ExpId> address) : identName(identName), address(address) {};
 
 GraphManager &GraphManager::instance() {
     static GraphManager single_instance;
