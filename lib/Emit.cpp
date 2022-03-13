@@ -85,25 +85,22 @@ void emitDesignator() {
         ExpId accOffset = instructAccOffset.id;
         
         // The accumulate multiply result
-        Instruct instructAccMul(OpCode::op_cnst, 1);
-        graphObj.graph.back().push_back(instructAccMul);
-        ExpId accMul = instructAccMul.id;
+        Number accMul = 1;
         
         // Emit instructions and get the real offset of array
         while(curPtr > 0) {
             // Get the exp_id of current index
             ExpId curIndex = indexes[curPtr-1];
-            // Multiply with accMul and get the result
-            Instruct curMulAcc(OpCode::op_mul, curIndex, accMul);
+            // Put accMul into basic block
+            Instruct putAccMul(OpCode::op_cnst, accMul);
+            graphObj.graph.back().push_back(putAccMul);
+            ExpId accMulId = putAccMul.id;
+            // Multiply with accMul with curIndex and get the result
+            Instruct curMulAcc(OpCode::op_mul, curIndex, accMulId);
             graphObj.graph.back().push_back(curMulAcc);
             ExpId mulResult = curMulAcc.id;
             // Update accMul
-            Instruct putOriginIndex(OpCode::op_cnst, type[curPtr-1]);
-            graphObj.graph.back().push_back(putOriginIndex);
-            ExpId originIndex = putOriginIndex.id;
-            Instruct newAccMul(OpCode::op_mul, originIndex, accMul);
-            graphObj.graph.back().push_back(newAccMul);
-            accMul = newAccMul.id;
+            accMul *= type[curPtr-1];
             // Update accOffset
             Instruct addWithAccOffset(OpCode::op_add, mulResult, accOffset);
             graphObj.graph.back().push_back(addWithAccOffset);
