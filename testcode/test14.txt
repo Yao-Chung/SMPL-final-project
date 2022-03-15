@@ -1,16 +1,15 @@
 main
 varx,y,z1,z2,z3;
-voidfunctionf1();
+functionf1();
 varx,y,z;
 {
 let x<-1;
 let y<-2;
 let z<-3;
-return;
+return x+y+z;
 };
 {
-call f1();
-let x<-10;
+let x<-call f1();
 let y<-x;
 let z1<-3+y;
 let z2<-3+x;

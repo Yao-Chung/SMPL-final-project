@@ -124,9 +124,9 @@ void emitDesignator() {
 // Read value from stack
 void emitFactor() {
     ContextManager &contextObj = ContextManager::instance();
+    GraphManager &graphObj = GraphManager::instance();
     // Factor is Number
     if(contextObj.consumed.top().type() == typeid(Number)) {
-        GraphManager &graphObj = GraphManager::instance();
         // Get number from stack
         Number number = std::any_cast<Number>(contextObj.consumed.top());
         contextObj.consumed.pop();
@@ -136,7 +136,6 @@ void emitFactor() {
         contextObj.consumed.push(instruct.id);
     }else if(contextObj.consumed.top().type() == typeid(Designator)) {
         // Factor is designator
-        GraphManager &graphObj = GraphManager::instance();
         Designator designator = std::any_cast<Designator>(contextObj.consumed.top());
         contextObj.consumed.pop();
         
@@ -154,9 +153,16 @@ void emitFactor() {
             graphObj.graph.back().push_back(getArrayValue);
             contextObj.consumed.push(getArrayValue.id);
         }
+    }else if(contextObj.consumed.top().type() == typeid(FuncReturnExpId)) {
+        // function call, then get returnExpid
+        FuncReturnExpId returnExpId = std::any_cast<FuncReturnExpId>(contextObj.consumed.top());
+        contextObj.consumed.pop();
+        // Change arrow's expectVoid into false (always change the lastest one)
+        graphObj.graph.arrows.back().expectVoid = false;
+        // Push ExpId into stack
+        contextObj.consumed.push(returnExpId.exp_id);
     }
     // Expression: do nothing since the expId already in consumed stack
-    //TODO:  function call
 }
 void emitTerm(const std::string &operators) {
     ContextManager &contextObj = ContextManager::instance();
@@ -258,8 +264,7 @@ void emitAssignment() {
 void emitFuncCall() {
     ContextManager &contextObj = ContextManager::instance();
     GraphManager &graphObj = GraphManager::instance();
-    // Emit branch instruction (emplace_back return reference)
-    Instruct& instruct = graphObj.graph.back().emplace_back(OpCode::op_call, 0);
+    
     std::string funcName;
     std::vector<ExpId> paraExpIds;
     // Get funcName and parameter ids
@@ -269,10 +274,37 @@ void emitFuncCall() {
     }
     funcName = std::any_cast<std::string>(contextObj.consumed.top());
     contextObj.consumed.pop();
-    reverse(paraExpIds.begin(), paraExpIds.end());
-    // TODO: deal with parameters
+    // Deal with predefined function
+    if(funcName == "inputnum") {
+        if(!paraExpIds.empty()) {
+            throw std::invalid_argument("InputNum can not have parameter");
+        }
+        Instruct instruct(OpCode::op_read);
+        graphObj.graph.back().push_back(instruct);
+        // Push ExpId into consumed stack
+        contextObj.consumed.push(instruct.id);
+    }else if(funcName == "outputnum") {
+        if(paraExpIds.size() != 1) {
+            throw std::invalid_argument("OutputNum can only have one parameter");
+        }
+        graphObj.graph.back().emplace_back(OpCode::op_write, paraExpIds.front());
+    }else if(funcName == "outputnewline") {
+        if(!paraExpIds.empty()) {
+            throw std::invalid_argument("OutputNewLine can not have parameter");
+        }
+        graphObj.graph.back().emplace_back(OpCode::op_writeNL);
+    }else {
+        // Emit branch instruction (emplace_back return reference)
+        Instruct& instruct = graphObj.graph.back().emplace_back(OpCode::op_call, 0);
+        // Other functions
+        reverse(paraExpIds.begin(), paraExpIds.end());
+        // TODO: deal with parameters
 
-    graphObj.graph.arrows.emplace_back(funcName, instruct.id, (BlockId)graphObj.graph.size()-1);
+        graphObj.graph.arrows.emplace_back(funcName, instruct.id, (BlockId)graphObj.graph.size()-1, paraExpIds);
+        // Push func return class into consumed stack
+        FuncReturnExpId returnExpId(instruct.id);
+        contextObj.consumed.push(returnExpId);
+    }
 }
 void emitIfStatement() {
     ContextManager &contextObj = ContextManager::instance();
@@ -484,6 +516,8 @@ void emitReturnStatement() {
     }
     if(exp_id.has_value() && graphObj.graph.isVoid == true) {
         throw std::invalid_argument("void function can not return value");
+    }else if(exp_id == std::nullopt && graphObj.graph.isVoid == false) {
+        throw std::invalid_argument("non void function must return value");
     }
     graphObj.graph.back().emplace_back(OpCode::op_return, exp_id);
 }
@@ -604,6 +638,8 @@ void startComputation() {
 void endComputation() {
     // Update current graph into map
     GraphManager &graphObj = GraphManager::instance();
+    // Emit end instruction
+    graphObj.graph.back().emplace_back(OpCode::op_end);
     graphObj.funcToGraph[graphObj.graph.funcName] = graphObj.graph;
     rewrite_after_loop();
     fixBranchToFunc();
@@ -705,7 +741,7 @@ void common_subexpression_elimination() {
 }
 void fixBranchToFunc() {
     // TODO: parameters version
-
+    
     // Get instance of GraphManager
     GraphManager &graphObj = GraphManager::instance();
     // Modify branch to function instruction

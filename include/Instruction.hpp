@@ -55,13 +55,22 @@ public:
     Designator(std::string identName = "", std::optional<ExpId> address = std::nullopt);
 };
 
+// Using for factor to distinguish
+class FuncReturnExpId {
+public:
+    ExpId exp_id;
+    FuncReturnExpId(ExpId exp_id);
+};
+
 class FuncArrow {
 public:
     std::string destination;
     ExpId sourceId;
     BlockId blockIndex;
+    std::vector<ExpId> paraExpIds;
     bool expectVoid;        // Using when parsing factor
-    FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, bool expectVoid = true);
+    
+    FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, std::vector<ExpId> paraExpIds, bool expectVoid = true);
 };
 
 // Data structure of a basic block
