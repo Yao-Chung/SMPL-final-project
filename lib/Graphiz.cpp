@@ -54,7 +54,17 @@ void PrintGraph::print() {
 				throw std::invalid_argument("expectVoid conflicts with isVoid");
 			}
 			out << funcName << "bb" << (arrow.blockIndex + 1) << ":" << arrow.sourceId << " -> " << arrow.destination << "bb1" << ":n ";
-			out << "[color=green, style=solid, label=\"call\"]\n";
+			// Print parameters on arrow
+			std::string all_parameters;
+			all_parameters += "(";
+			for(auto exp_id: arrow.paraExpIds) {
+				all_parameters += (std::to_string(exp_id) + ",");
+			}
+			if(all_parameters != "(") {
+				all_parameters.pop_back();
+			}
+			all_parameters += ")";
+			out << "[color=green, style=solid, label=\"call " << all_parameters << "\"]\n";
 		}
 	}
 	out << "\n}";

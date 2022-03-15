@@ -649,26 +649,28 @@ void rewrite_after_loop() {
     GraphManager &graphObj = GraphManager::instance();
     for(auto [funcName, curGraph]: graphObj.funcToGraph) {
         graphObj.graph = curGraph;
-        // Rewrite from root
-        std::optional<BlockId> curIndex = 0;
-        std::unordered_map<ExpId, ExpId> lastMap;
-        while(curIndex != std::nullopt) {
-            // Build curMap before rewriting
-            std::unordered_map<ExpId, ExpId> curMap;
-            for(auto &instruct: graphObj.graph[curIndex.value()]) {
-                if(instruct.opcode == OpCode::op_phi) {
-                    curMap[instruct.x.value()] = instruct.id;
-                    curMap[instruct.y.value()] = instruct.id;
+        for(BlockId i=0; i<graphObj.graph.size(); i++) {
+            // Rewrite from root
+            std::optional<BlockId> curIndex = 0;
+            std::unordered_map<ExpId, ExpId> lastMap;
+            while(curIndex != std::nullopt) {
+                // Build curMap before rewriting
+                std::unordered_map<ExpId, ExpId> curMap;
+                for(auto &instruct: graphObj.graph[curIndex.value()]) {
+                    if(instruct.opcode == OpCode::op_phi) {
+                        curMap[instruct.x.value()] = instruct.id;
+                        curMap[instruct.y.value()] = instruct.id;
+                    }
+                    if(instruct.x != std::nullopt && lastMap.count(instruct.x.value())) {
+                        instruct.x = lastMap[instruct.x.value()];
+                    }
+                    if(instruct.y != std::nullopt && lastMap.count(instruct.y.value())) {
+                        instruct.y = lastMap[instruct.y.value()];
+                    }
                 }
-                if(instruct.x != std::nullopt && lastMap.count(instruct.x.value())) {
-                    instruct.x = lastMap[instruct.x.value()];
-                }
-                if(instruct.y != std::nullopt && lastMap.count(instruct.y.value())) {
-                    instruct.y = lastMap[instruct.y.value()];
-                }
+                lastMap = curMap;
+                curIndex = graphObj.graph[curIndex.value()].fall_through;
             }
-            lastMap = curMap;
-            curIndex = graphObj.graph[curIndex.value()].fall_through;
         }
         graphObj.funcToGraph[funcName] = graphObj.graph;
     }
@@ -741,7 +743,7 @@ void common_subexpression_elimination() {
 }
 void fixBranchToFunc() {
     // TODO: parameters version
-    
+
     // Get instance of GraphManager
     GraphManager &graphObj = GraphManager::instance();
     // Modify branch to function instruction
@@ -753,6 +755,13 @@ void fixBranchToFunc() {
             if(!graphObj.funcToGraph.contains(destFunc)) {
                 throw std::invalid_argument( "The function does not exist." );
             }else {
+                // Check function void expectation on arrow match with real situation
+                if(graph.arrows[i].expectVoid != graphObj.funcToGraph[destFunc].isVoid) {
+                    throw std::invalid_argument("expectVoid conflicts with isVoid");
+                }else if(graphObj.funcToGraph[destFunc].paraNumber != graph.arrows[i].paraExpIds.size()){
+                    // Check the parameter numbers does not match
+                    throw std::invalid_argument("parameter numbers does not match");
+                }
                 // Function exists, then update the branch instruction
                 BlockId blockIndex = graph.arrows[i].blockIndex;
                 for(auto &instruct: graph[blockIndex]) {
