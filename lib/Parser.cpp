@@ -209,11 +209,13 @@ bool isFuncCall(std::string_view &s){
             if(s_copy.size() > 0 && s_copy[0] == ')'){
                 s_copy = s_copy.substr(1);
                 s = s_copy;
+                emitFuncCall();
                 return true;
             }
         }else{
             // Function with no parameter and no parantheses
             s = s_copy;
+            emitFuncCall();
             return true;
         }
     }
@@ -303,6 +305,7 @@ bool isReturnStatement(std::string_view &s){
             s = s_copy;
         }
     }
+    emitReturnStatement();
     return true;
 }
 
@@ -405,8 +408,10 @@ bool isVarDecl(std::string_view &s){
 
 bool isFuncDecl(std::string_view &s){
     std::string_view s_copy = s;
+    bool isVoid = false;
     // Test and consume "void"
     if(s_copy.size() >= 4 && s_copy.substr(0, 4) == std::string_view("void")){
+        isVoid = true;
         s_copy = s_copy.substr(4);
     }
     // Test "function"
@@ -425,6 +430,7 @@ bool isFuncDecl(std::string_view &s){
     }
     // Consume ';'
     s_copy = s_copy.substr(1);
+    startFuncDecl(isVoid);
     // Test funcBody
     if(!isFuncBody(s_copy)){
         return false;
@@ -436,6 +442,7 @@ bool isFuncDecl(std::string_view &s){
     // Consume ';'
     s_copy = s_copy.substr(1);
     s = s_copy;
+    endFuncDecl();
     return true;
 }
 
@@ -491,6 +498,7 @@ bool isComputation(std::string_view &s){
     if(s_copy.size() < 4 || s_copy.substr(0, 4) != std::string_view("main")){
         return false;
     }
+    startComputation();
     // Consume "main"
     s_copy = s_copy.substr(4);
     // Consume VarDecl
@@ -518,6 +526,6 @@ bool isComputation(std::string_view &s){
     // Consume "}."
     s_copy = s_copy.substr(2);
     s = s_copy;
-    emitComputation();
+    endComputation();
     return true;
 }

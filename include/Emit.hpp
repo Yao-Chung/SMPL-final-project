@@ -15,16 +15,22 @@ void emitTerm(const std::string &operators);
 void emitExpression(const std::string &operators);
 void emitRelation();
 void emitAssignment();
+void emitFuncCall();
 void emitIfStatement();
 void emitWhileStatement();
+void emitReturnStatement();
 void startStatSequence();
 void endStatSequence();
 void emitTypeDecl(const int &dimNumber);
 void emitVarDecl();     // Put variable into map
-void emitComputation();
+void startFuncDecl(const bool &isVoid);
+void endFuncDecl();
+void startComputation();
+void endComputation();
 void rewrite_after_loop();
 void common_subexpression_elimination();
 void copy_propagation();
+void fixBranchToFunc();
 std::string opCode_to_string(Instruct instruct);
 
 #endif

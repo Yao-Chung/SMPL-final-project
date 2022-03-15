@@ -14,8 +14,11 @@ enum OpCode {
     op_cmp, op_adda, op_load, op_store, op_phi,
     op_end, op_bra, op_bne, op_beq, op_ble,
     op_blt, op_bge, op_bgt, op_read, op_write,
-    op_writeNL, op_cnst, op_init
+    op_writeNL, op_cnst, op_init, op_call, op_return
 };
+// op_init: deal with branch to empty basic block
+// op_call: the id represents the return result
+// op_return: the id represents the return result
 
 enum class RelOp {
     EQ, NEQ, LT, LTEQ, GT, GTEQ
@@ -52,6 +55,15 @@ public:
     Designator(std::string identName = "", std::optional<ExpId> address = std::nullopt);
 };
 
+class FuncArrow {
+public:
+    std::string destination;
+    ExpId sourceId;
+    BlockId blockIndex;
+    bool expectVoid;        // Using when parsing factor
+    FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, bool expectVoid = true);
+};
+
 // Data structure of a basic block
 class BasicBlock : public std::vector<Instruct> {
 public:
@@ -71,13 +83,18 @@ class Graph : public std::vector<BasicBlock> {
 public:
     // map ident -> class (type, optional expression id)
     std::unordered_map<std::string, Variable> findIdent;
+    std::string funcName;
+    bool isVoid;
+    unsigned paraNumber;
+    std::vector<FuncArrow> arrows;
 };
 
 // Singleton manager
 class GraphManager {
 public:
     static GraphManager &instance();
-    Graph graph;
+    Graph graph;        // current graph
+    std::unordered_map<std::string, Graph> funcToGraph;
 protected:
     GraphManager() = default;
 };

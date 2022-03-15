@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-#define USE_CSE
+// #define USE_CSE
 
 int main(int argc, char *argv[]) {
     if(argc != 3) {

@@ -30,6 +30,8 @@ Variable::Variable(DataType type, std::optional<Number> arrSize, std::optional<E
 
 Designator::Designator(std::string identName, std::optional<ExpId> address) : identName(identName), address(address) {};
 
+FuncArrow::FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, bool expectVoid) : destination(destination), sourceId(sourceId), blockIndex(blockIndex), expectVoid(expectVoid) {};
+
 GraphManager &GraphManager::instance() {
     static GraphManager single_instance;
     return single_instance;

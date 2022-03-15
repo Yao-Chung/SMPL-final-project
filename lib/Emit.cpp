@@ -255,6 +255,25 @@ void emitAssignment() {
         graphObj.graph.back().push_back(storeToAddress);
     }
 }
+void emitFuncCall() {
+    ContextManager &contextObj = ContextManager::instance();
+    GraphManager &graphObj = GraphManager::instance();
+    // Emit branch instruction (emplace_back return reference)
+    Instruct& instruct = graphObj.graph.back().emplace_back(OpCode::op_call, 0);
+    std::string funcName;
+    std::vector<ExpId> paraExpIds;
+    // Get funcName and parameter ids
+    while(contextObj.consumed.top().type() == typeid(ExpId)) {
+        paraExpIds.push_back(std::any_cast<ExpId>(contextObj.consumed.top()));
+        contextObj.consumed.pop();
+    }
+    funcName = std::any_cast<std::string>(contextObj.consumed.top());
+    contextObj.consumed.pop();
+    reverse(paraExpIds.begin(), paraExpIds.end());
+    // TODO: deal with parameters
+
+    graphObj.graph.arrows.emplace_back(funcName, instruct.id, (BlockId)graphObj.graph.size()-1);
+}
 void emitIfStatement() {
     ContextManager &contextObj = ContextManager::instance();
     GraphManager &graphObj = GraphManager::instance();
@@ -453,6 +472,21 @@ void emitWhileStatement() {
     // Push new block id into consumed stack
     contextObj.consumed.push((BlockId)graphObj.graph.size() - 1);
 }
+void emitReturnStatement() {
+    GraphManager &graphObj = GraphManager::instance();
+    ContextManager &contextObj = ContextManager::instance();
+
+    // Get the return expression
+    std::optional<ExpId> exp_id = std::nullopt;
+    if(contextObj.consumed.top().type() == typeid(ExpId)) {
+        exp_id = std::any_cast<ExpId>(contextObj.consumed.top());
+        contextObj.consumed.pop();
+    }
+    if(exp_id.has_value() && graphObj.graph.isVoid == true) {
+        throw std::invalid_argument("void function can not return value");
+    }
+    graphObj.graph.back().emplace_back(OpCode::op_return, exp_id);
+}
 void startStatSequence() {
     GraphManager &graphObj = GraphManager::instance();
     ContextManager &contextObj = ContextManager::instance();
@@ -522,34 +556,85 @@ void emitVarDecl() {
         }
     }
 }
-void emitComputation() {
+void startFuncDecl(const bool &isVoid) {
+    GraphManager &graphObj = GraphManager::instance();
+    ContextManager &contextObj = ContextManager::instance();
+    std::vector<std::string> paraNames;
+    std::string funcName;
+    while(!contextObj.consumed.empty() && contextObj.consumed.top().type() == typeid(std::string)) {
+        paraNames.push_back(std::any_cast<std::string>(contextObj.consumed.top()));
+        contextObj.consumed.pop();
+    }
+    // Get function name and pop out from vector
+    funcName = paraNames.back();
+    paraNames.pop_back();
+    // Reverse to get original parameters order
+    reverse(paraNames.begin(), paraNames.end());
+    // Store current graph into main graph
+    graphObj.funcToGraph["main"] = graphObj.graph;
+    // Create new graph for function and update current graph
+    graphObj.funcToGraph[funcName] = Graph();
+    graphObj.graph = graphObj.funcToGraph[funcName];
+    // Update funcName in current graph
+    graphObj.graph.funcName = funcName;
+    // Update paraNumber in current graph
+    graphObj.graph.paraNumber = paraNames.size();
+    // Update void flag in current graph
+    graphObj.graph.isVoid = isVoid;
+    // Put paraNames into map
+    for(auto paraName: paraNames) {
+        graphObj.graph.findIdent[paraName] = Variable();
+    }
+}
+void endFuncDecl() {
+    GraphManager &graphObj = GraphManager::instance();
+    // Update current graph into map
+    graphObj.funcToGraph[graphObj.graph.funcName] = graphObj.graph;
+    // Update current graph to main graph
+    graphObj.graph = graphObj.funcToGraph["main"];
+}
+void startComputation() {
+    GraphManager &graphObj = GraphManager::instance();
+    graphObj.funcToGraph["main"] = Graph();
+    graphObj.graph = graphObj.funcToGraph["main"];
+    graphObj.graph.paraNumber = 0;
+    graphObj.graph.funcName = "main";
+    graphObj.graph.isVoid = true;
+}
+void endComputation() {
+    // Update current graph into map
+    GraphManager &graphObj = GraphManager::instance();
+    graphObj.funcToGraph[graphObj.graph.funcName] = graphObj.graph;
     rewrite_after_loop();
+    fixBranchToFunc();
 }
 void rewrite_after_loop() {
     // Get instance from singleton class
     GraphManager &graphObj = GraphManager::instance();
-    ContextManager &contextObj = ContextManager::instance();
-
-    // Rewrite from root
-    std::optional<BlockId> curIndex = 0;
-    std::unordered_map<ExpId, ExpId> lastMap;
-    while(curIndex != std::nullopt) {
-        // Build curMap before rewriting
-        std::unordered_map<ExpId, ExpId> curMap;
-        for(auto &instruct: graphObj.graph[curIndex.value()]) {
-            if(instruct.opcode == OpCode::op_phi) {
-                curMap[instruct.x.value()] = instruct.id;
-                curMap[instruct.y.value()] = instruct.id;
+    for(auto [funcName, curGraph]: graphObj.funcToGraph) {
+        graphObj.graph = curGraph;
+        // Rewrite from root
+        std::optional<BlockId> curIndex = 0;
+        std::unordered_map<ExpId, ExpId> lastMap;
+        while(curIndex != std::nullopt) {
+            // Build curMap before rewriting
+            std::unordered_map<ExpId, ExpId> curMap;
+            for(auto &instruct: graphObj.graph[curIndex.value()]) {
+                if(instruct.opcode == OpCode::op_phi) {
+                    curMap[instruct.x.value()] = instruct.id;
+                    curMap[instruct.y.value()] = instruct.id;
+                }
+                if(instruct.x != std::nullopt && lastMap.count(instruct.x.value())) {
+                    instruct.x = lastMap[instruct.x.value()];
+                }
+                if(instruct.y != std::nullopt && lastMap.count(instruct.y.value())) {
+                    instruct.y = lastMap[instruct.y.value()];
+                }
             }
-            if(instruct.x != std::nullopt && lastMap.count(instruct.x.value())) {
-                instruct.x = lastMap[instruct.x.value()];
-            }
-            if(instruct.y != std::nullopt && lastMap.count(instruct.y.value())) {
-                instruct.y = lastMap[instruct.y.value()];
-            }
+            lastMap = curMap;
+            curIndex = graphObj.graph[curIndex.value()].fall_through;
         }
-        lastMap = curMap;
-        curIndex = graphObj.graph[curIndex.value()].fall_through;
+        graphObj.funcToGraph[funcName] = graphObj.graph;
     }
 }
 void common_subexpression_elimination() {
@@ -558,49 +643,88 @@ void common_subexpression_elimination() {
     ContextManager &contextObj = ContextManager::instance();
 
     std::unordered_map<ExpId, ExpId> replace;
-    while(true) {
-        unsigned oidSize = replace.size();
-        // For each basic block, do common subexpression elimination
-        for(int i=0; i<graphObj.graph.size(); i++) {
-            // Build the set of dominated blocks' instruction
-            std::unordered_map<std::string, Instruct> domInstruct;
-            BlockId curIndex = i;
-            while(graphObj.graph[curIndex].dom != std::nullopt) {
-                curIndex = graphObj.graph[curIndex].dom.value();
-                for(auto instruct: graphObj.graph[curIndex]) {
-                    domInstruct[opCode_to_string(instruct)] = instruct;
+    for(auto [funcName, curGraph]: graphObj.funcToGraph) {
+        graphObj.graph = curGraph;
+        while(true) {
+            unsigned oidSize = replace.size();
+            // For each basic block, do common subexpression elimination
+            for(int i=0; i<graphObj.graph.size(); i++) {
+                // Build the set of dominated blocks' instruction
+                std::unordered_map<std::string, Instruct> domInstruct;
+                BlockId curIndex = i;
+                while(graphObj.graph[curIndex].dom != std::nullopt) {
+                    curIndex = graphObj.graph[curIndex].dom.value();
+                    for(auto instruct: graphObj.graph[curIndex]) {
+                        domInstruct[opCode_to_string(instruct)] = instruct;
+                    }
                 }
+                // Compare current block's instruction with domInstruct
+                BasicBlock block = graphObj.graph[i];
+                block.clear();
+                for(auto instruct: graphObj.graph[i]) {
+                    // Test and replace the deleted id
+                    if(instruct.x != std::nullopt && replace.count(instruct.x.value())) {
+                        instruct.x = replace[instruct.x.value()];
+                    }
+                    if(instruct.y != std::nullopt && replace.count(instruct.y.value())) {
+                        instruct.y = replace[instruct.y.value()];
+                    }
+                    std::string instructStr = opCode_to_string(instruct);
+                    if(domInstruct.count(instructStr)
+                        && instruct.opcode != OpCode::op_init
+                        && instruct.opcode != OpCode::op_bra
+                        && instruct.opcode != OpCode::op_bne
+                        && instruct.opcode != OpCode::op_beq
+                        && instruct.opcode != OpCode::op_ble
+                        && instruct.opcode != OpCode::op_blt
+                        && instruct.opcode != OpCode::op_bge
+                        && instruct.opcode != OpCode::op_bgt
+                    ) {
+                        // Repeated, then we can not push into block
+                        ExpId deleted_id = instruct.id, dom_id = domInstruct[instructStr].id;
+                        replace[deleted_id] = dom_id;
+                    }else if(instruct.opcode == OpCode::op_phi && instruct.x == instruct.y) {
+                        ExpId deleted_id = instruct.id, replace_id = instruct.x.value();
+                        replace[deleted_id] = replace_id;
+                    }else {
+                        // No need to eliminate, then we can push into block
+                        block.push_back(instruct);
+                        domInstruct[opCode_to_string(instruct)] = instruct;
+                    }
+                }
+                // Replace graph[i] with block
+                graphObj.graph[i] = block;
             }
-            // Compare current block's instruction with domInstruct
-            BasicBlock block = graphObj.graph[i];
-            block.clear();
-            for(auto instruct: graphObj.graph[i]) {
-                // Test and replace the deleted id
-                if(instruct.x != std::nullopt && replace.count(instruct.x.value())) {
-                    instruct.x = replace[instruct.x.value()];
-                }
-                if(instruct.y != std::nullopt && replace.count(instruct.y.value())) {
-                    instruct.y = replace[instruct.y.value()];
-                }
-                std::string instructStr = opCode_to_string(instruct);
-                if((domInstruct.count(instructStr) && instruct.opcode != OpCode::op_init)) {
-                    // Repeated, then we can not push into block
-                    ExpId deleted_id = instruct.id, dom_id = domInstruct[instructStr].id;
-                    replace[deleted_id] = dom_id;
-                }else if(instruct.opcode == OpCode::op_phi && instruct.x == instruct.y) {
-                    ExpId deleted_id = instruct.id, replace_id = instruct.x.value();
-                    replace[deleted_id] = replace_id;
-                }else {
-                    // No need to eliminate, then we can push into block
-                    block.push_back(instruct);
-                    domInstruct[opCode_to_string(instruct)] = instruct;
-                }
+            if(oidSize == replace.size()) {
+                break;
             }
-            // Replace graph[i] with block
-            graphObj.graph[i] = block;
         }
-        if(oidSize == replace.size()) {
-            break;
+        // Write optimized current graph into map
+        graphObj.funcToGraph[funcName] = graphObj.graph;
+    }
+}
+void fixBranchToFunc() {
+    // TODO: parameters version
+
+    // Get instance of GraphManager
+    GraphManager &graphObj = GraphManager::instance();
+    // Modify branch to function instruction
+    for(auto &[funcName, graph]: graphObj.funcToGraph) {
+        // Check arrows and update branch instruction
+        for(int i=0; i<graph.arrows.size(); i++) {
+            // Test if function exist or not
+            std::string destFunc = graph.arrows[i].destination;
+            if(!graphObj.funcToGraph.contains(destFunc)) {
+                throw std::invalid_argument( "The function does not exist." );
+            }else {
+                // Function exists, then update the branch instruction
+                BlockId blockIndex = graph.arrows[i].blockIndex;
+                for(auto &instruct: graph[blockIndex]) {
+                    if(instruct.id == graph.arrows[i].sourceId) {
+                        instruct.x = graphObj.funcToGraph[destFunc].front().front().id;
+                    }
+                }
+            }
         }
     }
 }
@@ -675,6 +799,16 @@ std::string opCode_to_string(Instruct instruct) {
 			break;
 		case OpCode::op_init:
 			ss << "\\<init\\>";
+            break;
+        case OpCode::op_call:
+            ss << "call " << "(" << instruct.x.value() << ")";
+            break;
+        case OpCode::op_return:
+            if(instruct.x.has_value())
+                ss << "return " << "(" << instruct.x.value() << ")";
+            else
+                ss << "return ";
+            break;
         default:
             ss << "";
     }
