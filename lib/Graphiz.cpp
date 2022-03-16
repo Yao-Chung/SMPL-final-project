@@ -58,7 +58,7 @@ void PrintGraph::print() {
 			std::string all_parameters;
 			all_parameters += "(";
 			for(auto exp_id: arrow.paraExpIds) {
-				all_parameters += (std::to_string(exp_id) + ",");
+				all_parameters += (std::to_string(exp_id.first) + " => " + std::to_string(exp_id.second) +",");
 			}
 			if(all_parameters != "(") {
 				all_parameters.pop_back();

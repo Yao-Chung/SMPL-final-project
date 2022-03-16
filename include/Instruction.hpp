@@ -8,6 +8,7 @@
 #include <string>
 #include <any>
 #include <stack>
+#include <utility>
 
 enum OpCode {
     op_neg, op_add, op_sub, op_mul, op_div,
@@ -67,10 +68,10 @@ public:
     std::string destination;
     ExpId sourceId;
     BlockId blockIndex;
-    std::vector<ExpId> paraExpIds;
+    std::vector<std::pair<ExpId, ExpId>> paraExpIds;
     bool expectVoid;        // Using when parsing factor
     
-    FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, std::vector<ExpId> paraExpIds, bool expectVoid = true);
+    FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, std::vector<std::pair<ExpId, ExpId>> paraExpIds, bool expectVoid = true);
 };
 
 // Data structure of a basic block
@@ -94,8 +95,8 @@ public:
     std::unordered_map<std::string, Variable> findIdent;
     std::string funcName;
     bool isVoid;
-    unsigned paraNumber;
     std::vector<FuncArrow> arrows;
+    std::vector<ExpId> paraIds;
 };
 
 // Singleton manager

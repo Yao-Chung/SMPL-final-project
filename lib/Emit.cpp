@@ -266,10 +266,10 @@ void emitFuncCall() {
     GraphManager &graphObj = GraphManager::instance();
     
     std::string funcName;
-    std::vector<ExpId> paraExpIds;
+    std::vector<std::pair<ExpId, ExpId>> paraExpIds;
     // Get funcName and parameter ids
     while(contextObj.consumed.top().type() == typeid(ExpId)) {
-        paraExpIds.push_back(std::any_cast<ExpId>(contextObj.consumed.top()));
+        paraExpIds.emplace_back(std::any_cast<ExpId>(contextObj.consumed.top()), 0);
         contextObj.consumed.pop();
     }
     funcName = std::any_cast<std::string>(contextObj.consumed.top());
@@ -287,7 +287,7 @@ void emitFuncCall() {
         if(paraExpIds.size() != 1) {
             throw std::invalid_argument("OutputNum can only have one parameter");
         }
-        graphObj.graph.back().emplace_back(OpCode::op_write, paraExpIds.front());
+        graphObj.graph.back().emplace_back(OpCode::op_write, paraExpIds.front().first);
     }else if(funcName == "outputnewline") {
         if(!paraExpIds.empty()) {
             throw std::invalid_argument("OutputNewLine can not have parameter");
@@ -611,13 +611,15 @@ void startFuncDecl(const bool &isVoid) {
     graphObj.graph = graphObj.funcToGraph[funcName];
     // Update funcName in current graph
     graphObj.graph.funcName = funcName;
-    // Update paraNumber in current graph
-    graphObj.graph.paraNumber = paraNames.size();
     // Update void flag in current graph
     graphObj.graph.isVoid = isVoid;
     // Put paraNames into map
     for(auto paraName: paraNames) {
-        graphObj.graph.findIdent[paraName] = Variable();
+        Instruct instruct;
+        Variable variable;
+        variable.exp_id = instruct.id;
+        graphObj.graph.paraIds.push_back(instruct.id);
+        graphObj.graph.findIdent[paraName] = variable;
     }
 }
 void endFuncDecl() {
@@ -631,7 +633,6 @@ void startComputation() {
     GraphManager &graphObj = GraphManager::instance();
     graphObj.funcToGraph["main"] = Graph();
     graphObj.graph = graphObj.funcToGraph["main"];
-    graphObj.graph.paraNumber = 0;
     graphObj.graph.funcName = "main";
     graphObj.graph.isVoid = true;
 }
@@ -758,9 +759,13 @@ void fixBranchToFunc() {
                 // Check function void expectation on arrow match with real situation
                 if(graph.arrows[i].expectVoid != graphObj.funcToGraph[destFunc].isVoid) {
                     throw std::invalid_argument("expectVoid conflicts with isVoid");
-                }else if(graphObj.funcToGraph[destFunc].paraNumber != graph.arrows[i].paraExpIds.size()){
+                }else if(graphObj.funcToGraph[destFunc].paraIds.size() != graph.arrows[i].paraExpIds.size()){
                     // Check the parameter numbers does not match
                     throw std::invalid_argument("parameter numbers does not match");
+                }
+                // Assign parameters to arguments
+                for(int j=0; j<graphObj.funcToGraph[destFunc].paraIds.size(); j++) {
+                    graph.arrows[i].paraExpIds[j].second = graphObj.funcToGraph[destFunc].paraIds[j];
                 }
                 // Function exists, then update the branch instruction
                 BlockId blockIndex = graph.arrows[i].blockIndex;

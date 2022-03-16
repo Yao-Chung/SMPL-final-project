@@ -6,10 +6,7 @@ varx,y,z;
 let x<-1;
 let y<-2;
 let z<-3;
-let a1<-4;
-let a2<-5;
-let a3<-6;
-return x+y+z;
+return a1+a2+a3;
 };
 {
 let x<-call f1(25,35,45);

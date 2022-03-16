@@ -32,7 +32,7 @@ Designator::Designator(std::string identName, std::optional<ExpId> address) : id
 
 FuncReturnExpId::FuncReturnExpId(ExpId exp_id) : exp_id(exp_id) {};
 
-FuncArrow::FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, std::vector<ExpId> paraExpIds, bool expectVoid) : destination(destination), sourceId(sourceId), blockIndex(blockIndex), paraExpIds(paraExpIds), expectVoid(expectVoid) {};
+FuncArrow::FuncArrow(std::string destination, ExpId sourceId, BlockId blockIndex, std::vector<std::pair<ExpId, ExpId>> paraExpIds, bool expectVoid) : destination(destination), sourceId(sourceId), blockIndex(blockIndex), paraExpIds(paraExpIds), expectVoid(expectVoid) {};
 
 GraphManager &GraphManager::instance() {
     static GraphManager single_instance;
