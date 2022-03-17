@@ -743,7 +743,6 @@ void common_subexpression_elimination() {
     }
 }
 void fixBranchToFunc() {
-    // TODO: parameters version
 
     // Get instance of GraphManager
     GraphManager &graphObj = GraphManager::instance();

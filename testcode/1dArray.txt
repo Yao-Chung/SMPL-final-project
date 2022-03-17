@@ -1,0 +1,11 @@
+main
+varb1,b2,b3,b4,b5;array[10]a1,a2,a3;
+{
+let b1<-2;
+let b2<-3;
+let b3<-4;
+let b4<-5;
+let b5<-6;
+let a1[b1]<-10;
+let a2[b2]<-100;
+}.

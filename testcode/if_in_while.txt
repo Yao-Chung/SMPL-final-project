@@ -6,9 +6,13 @@ let b2<-20;
 let b3<-30;
 let b4<-40;
 let b5<-50;
+while b1<b2 
+do 
 if b4>=b3 
-then let b5<-1100;
-let b3<-30;
-let b4<-40; 
+then let b5<-1100; 
+else 
+let b3<-1001; 
 fi;
+let b3<-100; 
+od
 }.
