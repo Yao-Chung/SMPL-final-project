@@ -681,8 +681,9 @@ void common_subexpression_elimination() {
     GraphManager &graphObj = GraphManager::instance();
     ContextManager &contextObj = ContextManager::instance();
 
-    std::unordered_map<ExpId, ExpId> replace;
     for(auto [funcName, curGraph]: graphObj.funcToGraph) {
+        // Global map for a graph
+        std::unordered_map<ExpId, ExpId> replace;
         graphObj.graph = curGraph;
         while(true) {
             unsigned oidSize = replace.size();
@@ -718,6 +719,9 @@ void common_subexpression_elimination() {
                         && instruct.opcode != OpCode::op_blt
                         && instruct.opcode != OpCode::op_bge
                         && instruct.opcode != OpCode::op_bgt
+                        && instruct.opcode != OpCode::op_read
+                        && instruct.opcode != OpCode::op_load
+                        && instruct.opcode != OpCode::op_store
                     ) {
                         // Repeated, then we can not push into block
                         ExpId deleted_id = instruct.id, dom_id = domInstruct[instructStr].id;
