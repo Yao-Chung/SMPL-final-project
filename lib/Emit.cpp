@@ -586,7 +586,11 @@ void emitVarDecl() {
     }else {
         // This is normal variable
         for(auto identName: identNames) {
-            graphObj.graph.findIdent[identName] = Variable(type);   
+            // Generate register for variable
+            Instruct instruct(OpCode::op_cnst, 0);
+            Variable variable(type);
+            variable.exp_id = instruct.id;
+            graphObj.graph.findIdent[identName] = variable;
         }
     }
 }
@@ -703,7 +707,7 @@ void common_subexpression_elimination() {
                 block.clear();
                 for(auto instruct: graphObj.graph[i]) {
                     // Test and replace the deleted id
-                    if(instruct.x != std::nullopt && replace.count(instruct.x.value())) {
+                    if(instruct.opcode != OpCode::op_cnst && instruct.x != std::nullopt && replace.count(instruct.x.value())) {
                         instruct.x = replace[instruct.x.value()];
                     }
                     if(instruct.y != std::nullopt && replace.count(instruct.y.value())) {

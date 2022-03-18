@@ -6,6 +6,7 @@
 #include <string>
 
 #define USE_CSE
+// #define Debug_readFile
 
 int main(int argc, char *argv[]) {
     if(argc != 3) {
@@ -19,6 +20,9 @@ int main(int argc, char *argv[]) {
         std::cout << "Read file error" << std::endl;
         return 1;
     }
+#ifdef Debug_readFile
+    return 0;
+#endif
     std::string_view source(code);
     if(!isComputation(source)) {
         std::cout << "Parsing error" << std::endl;

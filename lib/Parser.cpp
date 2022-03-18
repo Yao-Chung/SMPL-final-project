@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_set>
 
+// #define PrintAfterRead
 
 int readFile(std::string filename, std::string &s) {
     if(!std::filesystem::exists(filename)) {
@@ -43,9 +44,11 @@ int readFile(std::string filename, std::string &s) {
                 newLine += tmp;
             }
         }
+#ifdef PrintAfterRead
         if(!newLine.empty()) {
-            std::cout << newLine << std::endl;
+             std::cout << newLine << std::endl;
         }
+#endif
         s += newLine;
     }
     return 0;
