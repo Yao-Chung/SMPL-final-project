@@ -2,16 +2,51 @@
 #include <filesystem>
 #include <fstream>
 #include <Emit.hpp>
+#include <sstream>
+#include <unordered_set>
 
 
-int readFile(std::string filename, std::string &s){
-    if(!std::filesystem::exists(filename)){
+int readFile(std::string filename, std::string &s) {
+    if(!std::filesystem::exists(filename)) {
         return -1;
     }
     std::ifstream infile(filename);
     std::string line("");
-    while(std::getline(infile, line)){
-        s += line;
+    std::unordered_set<std::string> startKeyWord = {"let", "call", "if", "while", "return"};
+    std::unordered_set<std::string> midKeyWord = {"then", "do"};
+    std::unordered_set<std::string> endKeyWord = {"fi", "od", "fi;", "od;"};
+    while(std::getline(infile, line)) {
+        if(line.empty()) {
+            continue;
+        }
+        // Transform uppercase to lowercase
+        for(auto &c: line) {
+            if(isupper(c)) {
+                c = tolower(c);
+            }
+        }
+        // Handle white space problem
+        std::stringstream ss(line);
+        std::string newLine, tmp;
+        while(std::getline(ss, tmp, ' ')) {
+            if(tmp.empty()) {
+                continue;
+            }
+            // Handle white space around keyword
+            if(startKeyWord.contains(tmp)) {
+                newLine += (tmp + " ");
+            }else if(midKeyWord.contains(tmp)) {
+                newLine += (std::string(" ") + tmp + std::string(" "));
+            }else if(endKeyWord.contains(tmp)) {
+                newLine += (std::string(" ") + tmp);
+            }else {
+                newLine += tmp;
+            }
+        }
+        if(!newLine.empty()) {
+            std::cout << newLine << std::endl;
+        }
+        s += newLine;
     }
     return 0;
 }
@@ -299,11 +334,10 @@ bool isReturnStatement(std::string_view &s){
     // Consume "return"
     s = s.substr(6);
     // Consume expression if contain " expression"
-    if(s[0] == ' ' ) {
+    if(s[0] == ' ') {
         std::string_view s_copy = s.substr(1);
-        if(isExpression(s_copy)) {
-            s = s_copy;
-        }
+        isExpression(s_copy);
+        s = s_copy;
     }
     emitReturnStatement();
     return true;
