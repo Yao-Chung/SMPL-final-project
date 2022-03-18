@@ -724,6 +724,8 @@ void common_subexpression_elimination() {
                         && instruct.opcode != OpCode::op_bge
                         && instruct.opcode != OpCode::op_bgt
                         && instruct.opcode != OpCode::op_read
+                        && instruct.opcode != OpCode::op_write
+                        && instruct.opcode != OpCode::op_writeNL
                         && instruct.opcode != OpCode::op_load
                         && instruct.opcode != OpCode::op_store
                     ) {
